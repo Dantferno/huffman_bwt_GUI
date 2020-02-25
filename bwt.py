@@ -10,7 +10,6 @@ def construct_bwt(text):
     bwt = ''.join([i[-1] for i in orient])
     return bwt
 
-
 def decode_bwt(bwt):
     """decode input bwt"""
     # initialisation and first sort
@@ -28,6 +27,3 @@ def decode_bwt(bwt):
             return i[:-1]
 
 
-text = 'ACTTGATC'
-bwt = construct_bwt(text)
-print(decode_bwt(bwt))
