@@ -2,8 +2,9 @@ import gi
 
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
+from gi.repository import Gio
+from gi.repository import GObject
 from compression_class import Compression
-
 
 class Gui(Gtk.Notebook):
     """Result window giving all the result of the different algorithm in a gtk notebook"""
@@ -13,6 +14,8 @@ class Gui(Gtk.Notebook):
         self.parent = parent  # keep track of the parent window if user wants to go back to the input window
         self.result = res  # store the compression object where the result are stored
         self.set_scrollable(True)
+        self.file = None
+
 
         # Details page
         self.scroll1 = Gtk.ScrolledWindow()
@@ -29,16 +32,16 @@ class Gui(Gtk.Notebook):
             compress_len.set_line_wrap(True)
             ratio = Gtk.Label('Ratio :{}%'.format(len(res.text_huffman) / len(res.text) * 100))
             ratio.set_line_wrap(True)
-            self.page1.attach_next_to(compress_len, original_len, Gtk.PositionType.BOTTOM, 1 ,1)
-            self.page1.attach_next_to(ratio, compress_len, Gtk.PositionType.BOTTOM, 1 ,1)
-
+            self.page1.attach_next_to(compress_len, original_len, Gtk.PositionType.BOTTOM, 1, 1)
+            self.page1.attach_next_to(ratio, compress_len, Gtk.PositionType.BOTTOM, 1, 1)
 
         self.back_button = Gtk.Button('Go back')
         self.back_button.connect('clicked', self.go_back)
         self.page1.add(self.back_button)
-        self.save = Gtk.Button('Save')
-        self.save.connect('clicked', self.save_file)
+        self.save = Gtk.Button('Save Huffman')
+        self.save.connect('clicked', self.save_HF)
         self.page1.add(self.save)
+
 
         self.scroll1.add(self.page1)
         self.append_page(self.scroll1, Gtk.Label('Summary'))
@@ -48,7 +51,7 @@ class Gui(Gtk.Notebook):
             self.scroll2 = Gtk.ScrolledWindow()
             self.scroll2.set_policy(
                 Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-            self.page2 = Gtk.Grid(column_homogeneous=False,column_spacing=10,row_spacing=10)
+            self.page2 = Gtk.Grid(column_homogeneous=False, column_spacing=10, row_spacing=10)
             self.page2.set_border_width(10)
 
             # Inputed text
@@ -65,17 +68,16 @@ class Gui(Gtk.Notebook):
             input_text_textview = Gtk.TextView(buffer=buffer_input_textview)
             input_text_textview.set_editable(False)
             input_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
-            buffer_input_textview.set_text(res.text,len(res.text))
+            buffer_input_textview.set_text(res.text, len(res.text))
             scroll_input_textview.add(input_text_textview)
             self.page2.add(self.input_text_label)
-            self.page2.attach(scroll_input_textview,0,1,2,3)
+            self.page2.attach(scroll_input_textview, 0, 1, 2, 3)
 
             # Output text
             self.output_text_label = Gtk.Label('Output text : ')
             self.output_text_label.set_justify(Gtk.Justification.LEFT)
             self.output_text_label.set_line_wrap(True)
             self.page2.attach(self.output_text_label, 2, 0, 1, 1)
-
 
             # Textview + scrolled window for outputed text
             scroll_output_textview = Gtk.ScrolledWindow()
@@ -115,8 +117,6 @@ class Gui(Gtk.Notebook):
             scroll_compress_textview.add(compress_text_textview)
             self.page3.attach_next_to(scroll_compress_textview, compress, Gtk.PositionType.BOTTOM, 2, 3)
 
-
-
             # Textview + scrolled window for bin text
             bin_label = Gtk.Label('bin string : ')
             bin_label.set_line_wrap(True)
@@ -131,9 +131,6 @@ class Gui(Gtk.Notebook):
             buffer_bin_textview.set_text(res.bin_huffman, len(res.bin_huffman))
             scroll_bin_textview.add(bin_text_textview)
 
-
-
-
             self.page3.attach_next_to(bin_label, scroll_compress_textview, Gtk.PositionType.BOTTOM, 1, 1)
             self.page3.attach_next_to(scroll_bin_textview, bin_label, Gtk.PositionType.BOTTOM, 2, 3)
 
@@ -143,10 +140,10 @@ class Gui(Gtk.Notebook):
         if res.text_bwtHF != '':
             self.page4 = Gtk.Grid()
             self.page4.set_border_width(10)
-            compressed_BWT_label = Gtk.Label('Compression :' +res.text_bwtHF )
+            compressed_BWT_label = Gtk.Label('Compression :' + res.text_bwtHF)
             self.page4.add(compressed_BWT_label)
 
-            #scrollable textview for compressed bwthf
+            # scrollable textview for compressed bwthf
             scroll_compressBWT_textview = Gtk.ScrolledWindow()
             scroll_compressBWT_textview.set_hexpand(True)
             scroll_compressBWT_textview.set_vexpand(True)
@@ -157,28 +154,122 @@ class Gui(Gtk.Notebook):
             compressBWT_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
             buffer_compressBWT_textview.set_text(res.text_bwtHF, len(res.text_bwtHF))
             scroll_compressBWT_textview.add(compressBWT_text_textview)
-
-            self.page4.attach_next_to(scroll_compressBWT_textview, compressed_BWT_label,Gtk.PositionType.BOTTOM,3,3)
+            self.page4.attach_next_to(scroll_compressBWT_textview, compressed_BWT_label, Gtk.PositionType.BOTTOM, 3, 3)
+            self.savebwtHF = Gtk.Button('Save BWT + Huffman')
+            self.savebwtHF.connect('clicked', self.save_bwtHF)
+            self.page1.add(self.savebwtHF)
             self.append_page(self.page4, Gtk.Label('BWT + Huffmann'))
-
 
     def go_back(self, widget):
         """Destroy the current notebook and restore the input window"""
         self.parent.contain.remove(self.parent.contain.get_children()[0])
-        self.parent.contain.pack_start(InputWindow(self.parent), self.parent.contain, 1, 1)
+        self.input = self.parent.input
+        self.parent.contain.attach(self.input.switcher, 0, 0, 1,1)
+        self.parent.contain.attach(self.input, 0, 1, 1,1)
         self.parent.contain.show_all()
 
-    def save_file(self, w):
-        pass
+    def save_HF(self, w):
+        self.content_to_save = self.result.huffman_save
+        self.save_file(w)
 
+    def save_bwtHF(self, w):
+        self.content_to_save = self.result.bwthuffman_save
+        self.save_file(w)
+
+    def save_file(self, widget, event=None):
+        "Save compress to file"
+        save_dialog = Gtk.FileChooserDialog("Pick a file", self.parent,
+                                            Gtk.FileChooserAction.SAVE,
+                                            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                                             Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT))
+        # the dialog will present a confirmation dialog if the user types a file name that
+        # already exists
+        save_dialog.set_do_overwrite_confirmation(True)
+        # dialog always on top of the textview window
+        save_dialog.set_modal(True)
+        # if self.file has already been saved
+        if self.file is not None:
+            try:
+                # set self.file as the current filename for the file chooser
+                save_dialog.set_file(self.file)
+            except GObject.GError as e:
+                print("Error: " + e.message)
+        # connect the dialog to the callback function save_response_cb()
+        save_dialog.connect("response", self.save_response_cb)
+        # show the dialog
+        save_dialog.show()
+
+    # callback function for the dialog save_dialog
+    def save_response_cb(self, dialog, response_id):
+        save_dialog = dialog
+        # if response is "ACCEPT" (the button "Save" has been clicked)
+        if response_id == Gtk.ResponseType.ACCEPT:
+            # self.file is the currently selected file
+            self.file = save_dialog.get_file()
+            # save to file (see below)
+            self.save_to_file()
+        # if response is "CANCEL" (the button "Cancel" has been clicked)
+        elif response_id == Gtk.ResponseType.CANCEL:
+            print("cancelled: FileChooserAction.SAVE")
+        # destroy the FileChooserDialog
+        dialog.destroy()
+
+    # save_to_file
+    def save_to_file(self):
+        current_contents = self.content_to_save
+        # if there is some content
+        if current_contents != "":
+            # set the content as content of self.file.
+            # arguments: contents, etags, make_backup, flags, GError
+            try:
+                with open(self.file.get_path(),'w') as f:
+                    f.write(current_contents)
+                print("saved: " + self.file.get_path())
+            except GObject.GError as e:
+                print("Error: " + e.message)
+
+
+
+
+class Decompression(Gtk.Grid):
+    def __init__(self, parent):
+        Gtk.Grid.__init__(self)
+        self.parent = parent
+
+        # Label decompression
+        label_decompression = Gtk.Label('Choose a file to decompress : ')
+        self.attach(label_decompression, 0, 15, 1, 1)
+
+        # Choose file
+        self.choose_file = Gtk.FileChooserButton()
+
+        self.attach(self.choose_file, 1, 15, 1, 1)
+
+        # Confirm button
+        self.confirm = Gtk.Button('Go')
+        self.confirm.connect('clicked', self.next)
+        self.attach(self.confirm, 1, 111, 1, 1)
+
+    def next(self, widget):
+        file = self.choose_file.get_filename()
+        try :
+            with open(file, 'r') as f:
+                text = f.read()
+        except TypeError :
+            return
+        res = Compression(text, compress=False)
+        self.parent.contain.remove(self.parent.contain.get_children()[0])
+        self.parent.contain.remove(self.parent.contain.get_children()[0])
+        self.parent.contain.attach(Gui(self.parent, res), 0, 0, 1, 1)
+        self.parent.contain.show_all()
 
 class InputWindow(Gtk.Grid):
     """First window asking for the text to compress and which algorithm should be run"""
 
     def __init__(self, parent):
-        Gtk.Grid.__init__(self,column_homogeneous=False,
-                         column_spacing=10,
-                         row_spacing=10)
+        Gtk.Grid.__init__(self, column_homogeneous=False,
+                          column_spacing=10,
+                          row_spacing=10)
         self.selected_file = None
         self.choice = 'input'  # input or file depending of user choice, default to input
         self.parent = parent
@@ -187,30 +278,36 @@ class InputWindow(Gtk.Grid):
         self.hf = False
         self.bwthf = False
 
-
         # Input text
         checkbox_input = Gtk.RadioButton(label='Input text')
         checkbox_input.connect('toggled', self.enable_input)
 
         # label = Gtk.Label('Input :')
         self.buffer = Gtk.TextBuffer()
+        # make the textview content scrollable
         scrollable_textview = Gtk.ScrolledWindow()
         scrollable_textview.set_vexpand(True)
         scrollable_textview.set_hexpand(True)
 
+        #scrollable only if needed
         scrollable_textview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        # create the textview filled with a buffer
         self.text = Gtk.TextView(buffer=self.buffer)
+        # text wrap char mode so it can wrap DNA string without space
         self.text.set_wrap_mode(Gtk.WrapMode.CHAR)
+        # add the textview to the scrollable
         scrollable_textview.add(self.text)
-        self.attach(checkbox_input,0,0,1,1)
-        # self.attach(label,0,1, 1, 1)
-        self.attach(scrollable_textview,0,2, 2, 5)
+        # attach the checkbox to the grid
+        self.attach(checkbox_input, 0, 0, 1, 1)
+        # attach the textview to the grid
+        self.attach(scrollable_textview, 0, 2, 2, 5)
 
         # Choose file
         label_file = Gtk.RadioButton.new_from_widget(checkbox_input)
         label_file.set_label('Or choose file')
+        # enable file chooser if radio button checked
         label_file.connect('toggled', self.enable_file_chooser)
-
+        # create the filechosser
         self.choose = Gtk.FileChooserButton()
         self.choose.set_sensitive(False)
 
@@ -235,7 +332,7 @@ class InputWindow(Gtk.Grid):
         self.confirm = Gtk.Button('Go')
         self.confirm.connect('clicked', self.go)
         self.attach(self.confirm, 1, 111, 1, 1)
-        self.buffer.set_text('Text to be compressed...',24)
+        self.buffer.set_text('Text to be compressed...', 24)
 
     def enable_input(self, widget):
         """enable text input field if input checkbox is checked, disable file chooser"""
@@ -270,7 +367,8 @@ class InputWindow(Gtk.Grid):
             res = Compression(text.rstrip(), True, self.bwt, self.hf, self.bwthf)
             # Change window
             self.parent.contain.remove(self.parent.contain.get_children()[0])
-            self.parent.contain.pack_start(Gui(self.parent, res), self.parent.contain, 1, 1)
+            self.parent.contain.remove(self.parent.contain.get_children()[0])
+            self.parent.contain.attach(Gui(self.parent, res), 0, 0, 1, 1)
             self.parent.contain.show_all()
 
     def bwt_toggled(self, widget):
@@ -296,21 +394,36 @@ class InputWindow(Gtk.Grid):
 
 
 class MainWindow(Gtk.Window):
-    """Main window where the content change inside the box container, first vie is the InputWindow"""
+    """Main window where the content change inside the box container, first view is the InputWindow"""
 
     def __init__(self):
-        Gtk.Window.__init__(self, title="Compresseur")
+        Gtk.Window.__init__(self, title="DNA Compressor")
         # setup
         self.set_border_width(10)
         self.set_size_request(500, 500)
 
-        # View will change inside this box container
-        self.contain = Gtk.Box()
+        # View will change inside this container
+        self.contain = Gtk.Grid()
+
         self.add(self.contain)
         self.contain.show()
         # add InputWindow to the container
-        self.input = InputWindow(self)
-        self.contain.add(self.input)
+        # self.input = InputWindow(self)
+        self.input = stacker(self)
+        self.contain.attach(self.input.switcher, 0, 0, 1,1)
+        self.contain.attach(self.input, 0, 1, 1,1)
+
+class stacker(Gtk.Stack):
+    def __init__(self, parent):
+        Gtk.Stack.__init__(self)
+        self.parent = parent
+        compress = InputWindow(self.parent)
+        self.add_titled(compress, 'check', 'Compress')
+        decompress = Decompression(self.parent)
+        self.add_titled(decompress, 'label', 'uncompress')
+
+        self.switcher = Gtk.StackSwitcher()
+        self.switcher.set_stack(self)
 
 
 

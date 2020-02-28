@@ -26,4 +26,3 @@ def decode_bwt(bwt):
         if i[-1] == '$':
             return i[:-1]
 
-
