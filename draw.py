@@ -40,22 +40,6 @@ def OnDraw(w, cr):
     distance_entre_feuille = 50
     nodes = result.tree
     recursion(nodes[-1], 200, 50, cr)
-    i = 1
-    # for point in result.tree:
-    #     i +=1
-    #     cr.arc(0+distance_entre_feuille*i,300,10, 0, 2*math.pi) # feuille
-    #     cr.show_text(point)
-    #     len_path = len(result.tree[point])
-    #     place = 0
-    #     for j in result.tree[point]: # pour chaque 0 ou 1 dans le chemin
-    #         place += 1
-    #         if j == '0':
-    #             cr.arc(distance_entre_feuille*i+distance_entre_feuille/2,place*100,10,0,2*math.pi) # point secondaire
-    #             cr.show_text(j)
-    #         else:
-    #             cr.arc(distance_entre_feuille*i-distance_entre_feuille/2,len_path*100,10,0,2*math.pi) # point secondaire
-    #             cr.show_text(j)
-
     cr.fill()
 
 

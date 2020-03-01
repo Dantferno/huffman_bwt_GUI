@@ -31,7 +31,7 @@ class Node:
 class HuffmanResult:
     """Store the result, number of trailing 0 and the tree resulting from the compression"""
 
-    def __init__(self, coded_text, trim, alphabet, bin_text, tree):
+    def __init__(self, coded_text, trim, alphabet, bin_text=None, tree=None):
         self.coded = coded_text
         self.trim = trim
         self.alphabet = alphabet
@@ -85,7 +85,11 @@ def binary_trad(binary_text):
 
 def text_to_bin(code, trim):
     """take as input str and convert it to bin"""
-    return ''.join(format(ord(i), '08b') for i in code)[:-trim]
+    if trim != '0':
+        return ''.join(format(ord(i), '08b') for i in code)[:-int(trim)]
+    else:
+        return ''.join(format(ord(i), '08b') for i in code)
+
 
 
 def text_to_seq(code, dic):
@@ -148,7 +152,7 @@ def decoding(huffman_object):
     # go from the utf 8 to bin string
     code = text_to_bin(huffman_object.coded, huffman_object.trim)
     # go from the bin string to seq
-    return text_to_seq(code, huffman_object.tree)
+    return text_to_seq(code, huffman_object.alphabet)
 
 
 if __name__ == '__main__':

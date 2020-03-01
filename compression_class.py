@@ -1,5 +1,5 @@
 from bwt import decode_bwt, construct_bwt
-from huffman import encoding
+from huffman import encoding, decoding, HuffmanResult
 
 class Compression:
     """Object storing the result of the compression base and what is asked"""
@@ -24,7 +24,7 @@ class Compression:
 
 
         # If text should be compressed
-        if compress:
+        if self.compress:
             # store the bwt transform if bwt is asked
             if self.bwt:
                 self.text_bwt = construct_bwt(self.text)
@@ -44,12 +44,33 @@ class Compression:
                 self.bin_bwtHF = self.result_bwtHF.bin
                 self.bwtHF_to_save()
 
+        # if text should be decompressed
         else:
-            pass
+            if text.startswith('#'): # bwt + huf
+                text = text.splitlines()
+                dic_from_str = eval(text[0][1:]) # transform back the dic
+                trim = text[1]
+                coded = text[2:]
+                coded = "".join(i for i in coded)
+                result = HuffmanResult(coded, trim, dic_from_str)
+                decoded = decoding(result)
+                print(decoded)
+                self.decoded = decode_bwt(decoded)
+
+            else: # just huffman
+                text = text.splitlines()
+                dic_from_str = eval(text[0]) # transform back the dic
+                trim = text[1]
+                coded = text[2:]
+                coded = "".join(i for i in coded)
+                result = HuffmanResult(coded, trim, dic_from_str)
+                self.decoded = decoding(result)
+                print(trim, coded, dic_from_str)
+
 
     def HF_to_save(self):
-        self.huffman_save = str(self.result_huffman.alphabet)+ ' '+ str(self.result_huffman.trim) + '\n'+ self.result_huffman.coded
+        self.huffman_save = str(self.result_huffman.alphabet)+ '\n'+ str(self.result_huffman.trim) + '\n'+ self.result_huffman.coded
 
     def bwtHF_to_save(self):
-        self.bwthuffman_save = '# ' + str(self.result_huffman.alphabet) + ' '+ str(
-            self.result_huffman.trim) + '\n' + self.result_huffman.coded
+        self.bwthuffman_save = '# ' + str(self.result_bwtHF.alphabet) + '\n'+ str(
+            self.result_bwtHF.trim) + '\n' + self.result_bwtHF.coded
