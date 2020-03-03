@@ -8,7 +8,7 @@ def construct_bwt(text):
     # sort orient and create bwt by taking last letter of each subsitution ordered
     orient.sort()
     bwt = ''.join([i[-1] for i in orient])
-    return bwt
+    return bwt, orient # return bwt str and matrix
 
 def decode_bwt(bwt, steps=False):
     """decode input bwt"""

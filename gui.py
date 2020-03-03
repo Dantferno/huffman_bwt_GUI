@@ -1,5 +1,5 @@
 import gi
-
+import math
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 from gi.repository import Gio
@@ -55,7 +55,7 @@ class Gui(Gtk.Notebook):
                 self.page2 = Gtk.Grid(column_homogeneous=False, column_spacing=10, row_spacing=10)
                 self.page2.set_border_width(10)
 
-                # Inputed text
+                # Inputed text Label
                 self.input_text_label = Gtk.Label('Inputed text : ')
                 self.input_text_label.set_justify(Gtk.Justification.LEFT)
                 self.input_text_label.set_line_wrap(True)
@@ -93,14 +93,54 @@ class Gui(Gtk.Notebook):
                 scroll_output_textview.add(output_text_textview)
                 self.page2.attach(scroll_output_textview, 2, 1, 2, 3)
 
+
+                # bwt matrix
+                matrix_bwt = res.matrix_bwt
+                # matrix_bwt = [tuple(i) for i in res.matrix_bwt]
+
+                #scroll treeview
+                scroll_treeview = Gtk.ScrolledWindow()
+                scroll_treeview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+                scroll_treeview.set_hexpand(True)
+                scroll_treeview.set_vexpand(True)
+                matrix_list_store = Gtk.ListStore(*[str]*len(matrix_bwt[0])) # len(matrix) columns declared as string
+
+
+                # add row to listStore
+                for row in matrix_bwt:
+                    matrix_list_store.append(list(row))
+                # make treeview with liststore data
+                matrix_treeview = Gtk.TreeView(matrix_list_store)
+
+                for i in range(len(list(matrix_bwt[0]))):
+                    if i == len(list(matrix_bwt[0]))-1:
+                        renderer = Gtk.CellRendererText()
+                        renderer.set_property('background-set', 1)
+                        renderer.set_property('background', '#636965')
+                    else:
+                        renderer = Gtk.CellRendererText()
+                        renderer.set_property( 'background-set', 0)
+
+                    column = Gtk.TreeViewColumn(str(i), renderer, text=i)
+
+                    # add column to treeview
+                    matrix_treeview.append_column(column)
+
+                scroll_treeview.add(matrix_treeview)
+                self.page2.attach(scroll_treeview, 0, 4,6,6)
                 self.scroll2.add(self.page2)
-                self.append_page(self.scroll2, Gtk.Label('BWT'))
+
+                self.append_page(self.scroll, Gtk.Label('BWT'))
 
             # Huffman page
             if res.text_huffman != '':
+                scroll_page = Gtk.ScrolledWindow()
+                scroll_page.set_hexpand(True)
+                scroll_page.set_vexpand(True)
+                scroll_page.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
                 self.page3 = Gtk.Grid()
                 self.page3.set_border_width(10)
-
+                scroll_page.add(self.page3)
                 # Textview + scrolled window for compressed text
                 compress = Gtk.Label('Compression :')
                 compress.set_line_wrap(True)
@@ -132,10 +172,19 @@ class Gui(Gtk.Notebook):
                 buffer_bin_textview.set_text(res.bin_huffman, len(res.bin_huffman))
                 scroll_bin_textview.add(bin_text_textview)
 
+                # tree drawing
+                tree_drawing = Gtk.DrawingArea()
+                tree_drawing.connect('draw', self.OnDraw)
+                tree_drawing.set_size_request(400,400)
+                tree_drawing.set_hexpand(True)
+                tree_drawing.set_vexpand(True)
+
+
                 self.page3.attach_next_to(bin_label, scroll_compress_textview, Gtk.PositionType.BOTTOM, 1, 1)
                 self.page3.attach_next_to(scroll_bin_textview, bin_label, Gtk.PositionType.BOTTOM, 2, 3)
+                self.page3.attach_next_to(tree_drawing, scroll_bin_textview, Gtk.PositionType.BOTTOM, 2, 3)
 
-                self.append_page(self.page3, Gtk.Label('Huffmann'))
+                self.append_page(scroll_page, Gtk.Label('Huffmann'))
 
             # BWT + Huffman page
             if res.text_bwtHF != '':
@@ -169,6 +218,7 @@ class Gui(Gtk.Notebook):
             self.page1.set_border_width(10)
             self.page1.add(label)
             self.append_page(self.page1, Gtk.Label('Uncompressed text'))
+
 
 
     def go_back(self, widget):
@@ -239,7 +289,45 @@ class Gui(Gtk.Notebook):
             except GObject.GError as e:
                 print("Error: " + e.message)
 
+    def recursion(self, node, x, y, cr, narrow=0, text=''):
+        """ draw nodes and link following the tree"""
+        # draw the leaf
+        if node.leaf:
+            cr.set_source_rgb(0, 0, 255)
+            cr.arc(x, y, 10, 0, 2 * math.pi)
+            cr.show_text(str(node))
+            cr.fill()
+            return None
+        # draw the edges from the node to the children
+        # edge to the left
+        cr.set_source_rgb(1, 1, 1)
+        cr.move_to(x, y)
+        cr.line_to(x + 90 - narrow, y + 90)
+        cr.stroke()
+        # edge to the right
+        cr.move_to(x, y)
+        cr.set_source_rgb(0, 0, 0)
+        cr.line_to(x - 90 + narrow, y + 90)
+        cr.stroke()
+        # draw the node
+        cr.set_source_rgb(0, 200, 0)
+        cr.arc(x, y, 10, 0, 2 * math.pi)
+        cr.show_text(str(node))
+        cr.fill()
+        cr.show_text(text)
+        # do this for every path
+        self.recursion(node.get_left(), x+90-narrow, y+90, cr, narrow +30, '0')
+        self.recursion(node.get_right(), x-90+narrow, y+90, cr, narrow +30, '1')
 
+
+    def OnDraw(self, w, cr):
+        """Called to draw the tree"""
+        text = 'atgtagtacaacgactatatacat'
+        result = self.result.result_huffman
+        distance_entre_feuille = 50
+        nodes = result.tree
+        self.recursion(nodes[-1], 200, 50, cr)
+        cr.fill()
 
 
 class Decompression(Gtk.Grid):
