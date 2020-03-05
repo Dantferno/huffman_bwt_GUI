@@ -28,6 +28,7 @@ class Compression:
             # store the bwt transform if bwt is asked
             if self.bwt:
                 self.text_bwt, self.matrix_bwt = construct_bwt(self.text)
+
             # store the HuffmanResult object if huffman compression is asked
             if self.huffman:
                 self.result_huffman = encoding(self.text)

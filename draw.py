@@ -1,60 +1,69 @@
-from gi.repository import Gtk
-import cairo
-import math
-import huffman
+DEBUG = False
 
-def recursion(node, x, y, cr, narrow=0, text=''):
-    """ draw nodes and link following the tree"""
-    # draw the leaf
-    if node.leaf:
-        cr.set_source_rgb(0, 0, 255)
-        cr.arc(x, y, 10, 0, 2 * math.pi)
-        cr.show_text(str(node))
-        cr.fill()
-        return None
-    # draw the edges from the node to the children
-    # edge to the left
-    cr.set_source_rgb(1, 1, 1)
-    cr.move_to(x, y)
-    cr.line_to(x + 90 - narrow, y + 90)
-    cr.stroke()
-    # edge to the right
-    cr.move_to(x, y)
-    cr.set_source_rgb(0, 0, 0)
-    cr.line_to(x - 90 + narrow, y + 90)
-    cr.stroke()
-    # draw the node
-    cr.set_source_rgb(0, 200, 0)
-    cr.arc(x, y, 10, 0, 2 * math.pi)
-    cr.show_text(str(node))
-    cr.fill()
-    cr.show_text(text)
-    # do this for every path
-    recursion(node.get_left(), x+90-narrow, y+90, cr, narrow +30, '0')
-    recursion(node.get_right(), x-90+narrow, y+90, cr, narrow +30, '1')
+string = 'BCAADDDCCACACAC'
 
 
-def OnDraw(w, cr):
-    text = 'atgtagtacaacgactatatacat'
-    result = huffman.encoding(text)
-    distance_entre_feuille = 50
-    nodes = result.tree
-    recursion(nodes[-1], 200, 50, cr)
-    cr.fill()
+class NodeTree(object):
+
+    def __init__(self, left=None, right=None):
+        self.left = left
+        self.right = right
+
+    def children(self):
+        return (self.left, self.right)
+
+    def nodes(self):
+        return (self.left, self.right)
+
+    def __str__(self):
+        return '%s_%s' % (self.left, self.right)
 
 
-w = Gtk.Window()
-w.set_default_size(640, 480)
-g = Gtk.Box()
-a = Gtk.DrawingArea()
-w.add(a)
+def huffmanCodeTree(node, left=True, binString=''):
+    if type(node) is str:
+        return {node: binString}
+    (l, r) = node.children()
+    d = dict()
+    d.update(huffmanCodeTree(l, True, binString + '0'))
+    d.update(huffmanCodeTree(r, False, binString + '1'))
+    return d
 
-w.connect('destroy', Gtk.main_quit)
-a.connect('draw', OnDraw)
 
+if DEBUG:
+    print('Input file: ' + sys.argv[1])
 
+freq = {}
+for c in string:
+    if c in freq:
+        freq[c] += 1
+    else:
+        freq[c] = 1
 
-w.show_all()
+freq = sorted(freq.items(), key=lambda x: x[1], reverse=True)
 
-Gtk.main()
+if DEBUG:
+    print(' Char | Freq ')
+    for (key, c) in freq:
+        print(' %4r | %d' % (key, c))
 
+nodes = freq
+
+while len(nodes) > 1:
+    (key1, c1) = nodes[-1]
+    (key2, c2) = nodes[-2]
+    nodes = nodes[:-2]
+    node = NodeTree(key1, key2)
+    nodes.append((node, c1 + c2))
+
+    nodes = sorted(nodes, key=lambda x: x[1], reverse=True)
+
+if DEBUG:
+    print('left: %s' % nodes[0][0].nodes()[0])
+    print('right: %s' % nodes[0][0].nodes()[1])
+
+huffmanCode = huffmanCodeTree(nodes[0][0])
+
+print(' Char | Huffman code ')
+print('----------------------')
+for (char, frequency) in freq:
+    print(' %-4r |%12s' % (char, huffmanCode[char]))
