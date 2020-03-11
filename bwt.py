@@ -10,6 +10,19 @@ def construct_bwt(text):
     bwt = ''.join([i[-1] for i in orient])
     return bwt, orient # return bwt str and matrix
 
+def step_by_step_orientation(text):
+    """output matrix with all orientation"""
+    text += '$'
+    # list orient containing all ordered substitution of text
+    orient = []
+    for i in range(len(text)):
+        orient.append(text[i:] + text[:i])
+    return orient  # return bwt str and matrix
+
+def orientation_sort(matrix):
+    """sort the matrix with all orientation"""
+    return matrix.sort()
+
 def decode_bwt(bwt, steps=False):
     """decode input bwt"""
     # initialisation and first sort

@@ -1,14 +1,16 @@
-from bwt import decode_bwt, construct_bwt
+from bwt import decode_bwt, construct_bwt, step_by_step_orientation, orientation_sort
 from huffman import encoding, decoding, HuffmanResult
 
 class Compression:
     """Object storing the result of the compression base and what is asked"""
-    def __init__(self, text, compress=True, bwt=False, huffman=False, bwtHF=False):
+    def __init__(self, text, compress=True, bwt=False, huffman=False, bwtHF=False, step_by_step=False):
         self.text = text          # text to be compressed
         self.compress = compress  # Bool : Should the text be compressed or uncompressed
         self.bwt = bwt            # Bool : Apply bwt or not
         self.huffman = huffman    # Bool : Apply huffman or not
         self.bwtHF = bwtHF        # Bool : Apply bwt + huffman or not
+
+        self.step_by_step = step_by_step  # If the bwt will be shown step by step
 
         self.text_bwt = ''      # Will store bwt processed text
         self.text_huffman = ''  # Will store the huffman compressed text
@@ -21,14 +23,17 @@ class Compression:
 
         self.huffman_save = ''      # Store processed text to be saved in file
         self.bwthuffman_save = ''
+        self.bwt_save = ''
 
+        if step_by_step:
+            self.orientation = step_by_step_orientation(text)
 
         # If text should be compressed
         if self.compress:
             # store the bwt transform if bwt is asked
             if self.bwt:
                 self.text_bwt, self.matrix_bwt = construct_bwt(self.text)
-
+                self.bwt_to_save()
             # store the HuffmanResult object if huffman compression is asked
             if self.huffman:
                 self.result_huffman = encoding(self.text)
@@ -40,6 +45,7 @@ class Compression:
                 # Check if bwt is already done, if not do it
                 if self.text_bwt == '':
                     self.text_bwt, self.matrix_bwt = construct_bwt(self.text)
+                    self.bwt_to_save()
                 self.result_bwtHF = encoding(self.text_bwt)
                 self.text_bwtHF = self.result_bwtHF.coded
                 self.bin_bwtHF = self.result_bwtHF.bin
@@ -58,6 +64,12 @@ class Compression:
                 print(decoded)
                 self.decoded = decode_bwt(decoded)
 
+            if text.startswith('?'):
+                text = text.splitlines()
+                bwt_str = "".join(i for i in text[1:])
+                self.decoded = decode_bwt(bwt_str)
+
+
             else: # just huffman
                 text = text.splitlines()
                 dic_from_str = eval(text[0]) # transform back the dic
@@ -75,3 +87,11 @@ class Compression:
     def bwtHF_to_save(self):
         self.bwthuffman_save = '# ' + str(self.result_bwtHF.alphabet) + '\n'+ str(
             self.result_bwtHF.trim) + '\n' + self.result_bwtHF.coded
+
+    def bwt_to_save(self):
+        self.bwt_save = '?' + '\n' + self.text_bwt
+
+    def orientation_sort(self):
+        """sort the bwt matrix in the step by step process"""
+        self.orientation.sort()
+        return self.orientation
