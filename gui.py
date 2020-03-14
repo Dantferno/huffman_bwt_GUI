@@ -1,3 +1,17 @@
+"""
+All classes used for the interface are present in this file.
+Class holding the window is MainWindow(Gtk.Window). The first view of the application
+is a stack (stacker(Gtk.Stack)) where you can input a text or a file depending on your algorithm choice.
+Inside each stack is an instance of the class InputWindow.
+
+Once the algorithm is run, a NoteBook will appear (Gui(Gtk.Notebook)) with pages corresponding with the algorithm choice:
+DetailPage -> always shown, display information about length of input, length of resulted compress text, ratio of compression
+BwtPage -> shown if bwt has to be run.
+HuffmanPage -> shown if huffman is run.
+BwtHfPage -> shown if bwt + huffman is run.
+
+"""
+
 import gi
 import math
 import unicodedata
@@ -5,10 +19,463 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 from gi.repository import GObject
 from compression_class import Compression
+try:
+    gi.require_foreign("cairo")
+except ImportError:
+    print("No pycairo integration :(")
 
+
+class DetailPage(Gtk.ScrolledWindow):
+    """
+    Gtk.ScrolledWindow displaying information about the algorithms run. Intended to be a page inside a Gtk.Notebook
+
+    ...
+
+    Attributes
+    ----------
+    parent : Gtk.Notebook
+        The Notebook inside which to display the DetailPage
+    res : Compression object defined in compression_class
+        An object holding all the information about the results, inherited from the parent Gtk.Notebook
+    page1 : Gtk.Grid
+        A container holding the widget added to Gtk.ScrolledWindow
+    """
+
+    def __init__(self, parent):
+        super().__init__()
+        self.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        self.parent = parent
+        res = self.parent.result
+
+        # container type grid
+        self.page1 = Gtk.Grid()
+        self.page1.set_border_width(10)
+        #Label huffman
+        label_hf = Gtk.Label()
+        self.page1.add(label_hf)
+        #label original length
+        original_len = Gtk.Label('Original length : {}'.format(len(res.text)))
+        original_len.set_line_wrap(True)
+        original_len.set_justify(Gtk.Justification.LEFT)
+        self.page1.attach_next_to(original_len, label_hf, Gtk.PositionType.BOTTOM, 1, 1)
+
+        # If huffman compression has been done show some informations about it
+        if res.text_huffman != '':
+            # set text inside huffman label
+            label_hf.set_markup('<big><u>Huffman</u></big>')
+            label_hf.set_justify(Gtk.Justification.LEFT)
+            label_hf.set_line_wrap(True)
+            # display compressed length
+            compress_len = Gtk.Label('Compressed length : {}'.format(len(res.text_huffman)))
+            compress_len.set_line_wrap(True)
+            compress_len.set_justify(Gtk.Justification.LEFT)
+            # dispay ratio of compression
+            ratio = Gtk.Label('Ratio :{}%'.format(len(res.text_huffman) / len(res.text) * 100))
+            ratio.set_line_wrap(True)
+            ratio.set_justify(Gtk.Justification.LEFT)
+            # attach the labels to the grid
+            self.page1.attach_next_to(compress_len, original_len, Gtk.PositionType.BOTTOM, 1, 1)
+            self.page1.attach_next_to(ratio, compress_len, Gtk.PositionType.BOTTOM, 1, 1)
+
+        if res.text_bwtHF != '':
+            space_label = Gtk.Label()
+            self.page1.attach(space_label, 0, 4, 1, 1)
+            label_BWTHF = Gtk.Label('BWT + HF :')
+            label_BWTHF.set_line_wrap(True)
+            label_BWTHF.set_justify(Gtk.Justification.LEFT)
+            label_BWTHF.set_markup('<big><u>BWT + HF</u> </big>')
+            self.page1.attach(label_BWTHF, 0, 4, 1, 1)
+            compress_len_bwtHF = Gtk.Label('Compressed length BWT + HF : {}'.format(len(res.text_bwtHF)))
+            compress_len_bwtHF.set_line_wrap(True)
+            compress_len_bwtHF.set_justify(Gtk.Justification.LEFT)
+            ratio_bwtHF = Gtk.Label('Ratio : {}%'.format(len(res.text_bwtHF) / len(res.text) * 100))
+            ratio_bwtHF.set_line_wrap(True)
+            self.page1.attach_next_to(compress_len_bwtHF, label_BWTHF, Gtk.PositionType.BOTTOM, 1, 1)
+            self.page1.attach_next_to(ratio_bwtHF, compress_len_bwtHF, Gtk.PositionType.BOTTOM, 1, 1)
+
+
+        self.add(self.page1)
+        self.parent.append_page(self, Gtk.Label('Summary'))
+
+class BWTPage(Gtk.ScrolledWindow):
+    """
+    A class used to show the result of the BWT transform as a Page in a Gtk.Notebook
+
+    ...
+
+    Attributes
+    ----------
+    parent : Gtk.Notebook
+        The Notebook inside which to display the HuffmanPage
+    res : Compression object defined in compression_class
+        An object holding all the information about the results, inherited from the parent Gtk.Notebook
+
+    Methods
+    -------
+    sort_orientation(alphabet)
+        Called to sort the content of the Gtk.TreeView upon user
+
+    """
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.result = self.parent.result
+
+        self.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        self.page2 = Gtk.Grid(column_homogeneous=False, column_spacing=10, row_spacing=10)
+        self.page2.set_border_width(10)
+
+        # Inputed text Label
+        self.input_text_label = Gtk.Label('Inputed text : ')
+        self.input_text_label.set_justify(Gtk.Justification.LEFT)
+        self.input_text_label.set_line_wrap(True)
+
+        # Textview + scrolled window for inputed text
+        scroll_input_textview = Gtk.ScrolledWindow()
+        scroll_input_textview.set_hexpand(True)
+        scroll_input_textview.set_vexpand(True)
+        scroll_input_textview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        buffer_input_textview = Gtk.TextBuffer()
+        input_text_textview = Gtk.TextView(buffer=buffer_input_textview)
+        input_text_textview.set_editable(False)
+        input_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
+
+        buffer_input_textview.set_text(self.parent.sanitize_string(self.result.text), -1)
+        scroll_input_textview.add(input_text_textview)
+        self.page2.add(self.input_text_label)
+        self.page2.attach(scroll_input_textview, 0, 1, 2, 3)
+
+        # Output text
+        self.output_text_label = Gtk.Label('Output text : ')
+        self.output_text_label.set_justify(Gtk.Justification.LEFT)
+        self.output_text_label.set_line_wrap(True)
+        self.page2.attach(self.output_text_label, 2, 0, 1, 1)
+
+        # Textview + scrolled window for outputed text
+        scroll_output_textview = Gtk.ScrolledWindow()
+        scroll_output_textview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scroll_output_textview.set_hexpand(True)
+        scroll_output_textview.set_vexpand(True)
+        buffer_output_textview = Gtk.TextBuffer()
+        output_text_textview = Gtk.TextView(buffer=buffer_output_textview)
+        output_text_textview.set_editable(False)
+        output_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
+        buffer_output_textview.set_text(self.result.text_bwt, -1)
+        scroll_output_textview.add(output_text_textview)
+        self.page2.attach(scroll_output_textview, 2, 1, 2, 3)
+
+        # step by step
+        if self.result.step_by_step:
+            # not sorted matrix
+            matrix_bwt = self.result.orientation
+            self.i = 0
+            self.i_max = len(matrix_bwt)
+        else:
+            # already sorted matrix
+            matrix_bwt = self.result.matrix_bwt
+
+        # scroll treeview
+        scroll_treeview = Gtk.ScrolledWindow()
+        scroll_treeview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scroll_treeview.set_hexpand(True)
+        scroll_treeview.set_vexpand(True)
+        self.matrix_list_store = Gtk.ListStore(*[str] * len(matrix_bwt[0]))  # len(matrix) columns declared as string
+
+        # add row to listStore
+        for row in matrix_bwt:
+            self.matrix_list_store.append(list(row))
+
+        # make treeview with liststore data
+        matrix_treeview = Gtk.TreeView(self.matrix_list_store)
+
+        for i in range(len(list(matrix_bwt[0]))):
+            #color last column
+            if i == len(list(matrix_bwt[0])) - 1:
+                renderer = Gtk.CellRendererText()
+                renderer.set_property('background-set', 1)
+                renderer.set_property('background', '#636965')
+            else:
+                renderer = Gtk.CellRendererText()
+                renderer.set_property('background-set', 0)
+
+            column = Gtk.TreeViewColumn(str(i), renderer, text=i)
+
+            # add column to treeview
+            matrix_treeview.append_column(column)
+
+        # empty treview if step by step
+        if self.result.step_by_step:
+            self.matrix_list_store.clear()
+
+        scroll_treeview.add(matrix_treeview)
+        self.page2.attach(scroll_treeview, 0, 4, 6, 6)
+        # add button to sort matrix
+        if self.result.step_by_step:
+            self.button_sort = Gtk.Button('Next step')
+            self.button_sort.connect('clicked', self.sort_orientation)
+            self.page2.attach(self.button_sort, 0, 20, 1, 1)
+            self.final = Gtk.Button('Last step')
+            self.final.connect('clicked', lambda x: self.sort_orientation(self.final, final=True))
+            self.page2.attach(self.final, 1, 20, 1, 1)
+            self.sort = Gtk.Button('Sort')
+            self.sort.connect('clicked', self.sort_orientation)
+            self.sort.set_sensitive(False)
+            self.page2.attach(self.sort, 2, 20, 1, 1)
+
+
+        self.add(self.page2)
+
+        self.parent.append_page(self, Gtk.Label('BWT'))
+
+    def sort_orientation(self, widget, final=False):
+        """Called when user click on the sort button, will sort and display the matrix"""
+        # if user wants to go to final step
+        if final:
+            self.i = self.i_max
+        # while user want to display the i +1 line of the matrix, display it
+        if self.i < self.i_max:
+            self.i += 1
+            self.matrix_list_store.clear()
+            for row in self.result.orientation[:self.i]:
+                self.matrix_list_store.append(list(row))
+        # display last line and show sort button
+        elif self.i == self.i_max:
+            self.button_sort.set_sensitive(False)
+            self.final.set_sensitive(False)
+            self.sort.set_sensitive(True)
+            self.i += 1
+            self.matrix_list_store.clear()
+            for row in self.result.orientation[:self.i]:
+                self.matrix_list_store.append(list(row))
+            # remove step button
+            print('add button')
+            # show sort button
+
+        # sort matrix
+        else:
+            self.matrix_list_store.clear()
+            for row in self.result.orientation_sort():
+                self.matrix_list_store.append(list(row))
+            self.page2.remove_row(20)
+
+class HuffmanPage(Gtk.ScrolledWindow):
+    """
+    A class used to show the result of the huffman compression in a Gtk.Notebook
+
+    ...
+
+    Attributes
+    ----------
+    parent : Gtk.Notebook
+        The Notebook inside which to display the HuffmanPage
+    res : Compression object defined in compression_class
+        An object holding all the information about the results, inherited from the parent Gtk.Notebook
+
+    Methods
+    -------
+    create_alphabet_view(alphabet)
+        Create a Gtk.Treeview holding each letter of the uncompressed string associated with its corresponding
+        path in the tree using alphabet -> alphabet = {letter:'path',...}
+
+    """
+    def __init__(self, parent):
+        super().__init__()
+        self.parent= parent
+        res = self.parent.result
+
+        self.set_hexpand(True)
+        self.set_vexpand(True)
+        self.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        self.page3 = Gtk.Grid()
+        self.page3.set_border_width(10)
+        self.add(self.page3)
+        # Textview + scrolled window for compressed text
+        compress = Gtk.Label('Compression :')
+        compress.set_line_wrap(True)
+        self.page3.add(compress)
+
+        scroll_compress_textview = Gtk.ScrolledWindow()
+        scroll_compress_textview.set_hexpand(True)
+        scroll_compress_textview.set_vexpand(True)
+        scroll_compress_textview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        compress_bin_textview = Gtk.TextBuffer()
+        compress_text_textview = Gtk.TextView(buffer=compress_bin_textview)
+        compress_text_textview.set_editable(False)
+        compress_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
+        compress_bin_textview.set_text(self.parent.sanitize_string(res.text_huffman), -1)
+        scroll_compress_textview.add(compress_text_textview)
+        self.page3.attach_next_to(scroll_compress_textview, compress, Gtk.PositionType.BOTTOM, 2, 3)
+
+        # Textview + scrolled window for bin text
+        bin_label = Gtk.Label('bin string :')
+        bin_label.set_line_wrap(True)
+        self.scroll_bin_textview = Gtk.ScrolledWindow()
+        self.scroll_bin_textview.set_hexpand(True)
+        self.scroll_bin_textview.set_vexpand(True)
+        self.scroll_bin_textview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        buffer_bin_textview = Gtk.TextBuffer()
+        bin_text_textview = Gtk.TextView(buffer=buffer_bin_textview)
+        bin_text_textview.set_editable(False)
+        bin_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
+        buffer_bin_textview.set_text(res.bin_huffman, len(res.bin_huffman))
+        self.scroll_bin_textview.add(bin_text_textview)
+
+        # tree drawing
+        tree_drawing = Gtk.DrawingArea()
+        tree_drawing.connect('draw', self.parent.OnDraw)
+        tree_drawing.set_size_request(400, 500)
+        tree_drawing.set_hexpand(True)
+        tree_drawing.set_vexpand(True)
+
+        self.page3.attach_next_to(bin_label, scroll_compress_textview, Gtk.PositionType.BOTTOM, 1, 1)
+        self.page3.attach_next_to(self.scroll_bin_textview, bin_label, Gtk.PositionType.BOTTOM, 2, 3)
+        self.create_alphabet_view(res.result_huffman.alphabet)
+        self.page3.attach_next_to(tree_drawing, self.alphabet_treeview, Gtk.PositionType.BOTTOM, 2, 3)
+
+        self.parent.append_page(self, Gtk.Label('Huffmann'))
+
+    def create_alphabet_view(self, alphabet):
+        list_store = Gtk.ListStore(str, str)  # len(matrix) columns declared as string
+
+        # add row to listStore
+        for key in alphabet:
+            list_store.append([key, alphabet[key]])
+
+        # make treeview with liststore data
+        self.alphabet_treeview = Gtk.TreeView(list_store)
+
+        for i in range(2):
+            renderer = Gtk.CellRendererText()
+
+            column = Gtk.TreeViewColumn(str(i), renderer, text=i)
+
+            # add column to treeview
+            self.alphabet_treeview.append_column(column)
+
+        self.page3.attach_next_to(self.alphabet_treeview, self.scroll_bin_textview, Gtk.PositionType.BOTTOM, 1, 1)
+
+class BwtHfPage(Gtk.ScrolledWindow):
+    """
+        A class used to show the result of the huffman compression after a bwt in a Gtk.Notebook
+
+        ...
+
+        Attributes
+        ----------
+        parent : Gtk.Notebook
+            The Notebook inside which to display the BwtHfPage
+        res : Compression object defined in compression_class
+            An object holding all the information about the results, inherited from the parent Gtk.Notebook
+
+        Methods
+        -------
+        create_alphabet_view(alphabet)
+            Create a Gtk.Treeview holding each letter of the uncompressed string associated with its corresponding
+            path in the tree using alphabet -> alphabet = {letter:'path',...}
+
+        """
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        res = self.parent.result
+
+        self.set_hexpand(True)
+        self.set_vexpand(True)
+        self.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        self.page4 = Gtk.Grid()
+        self.page4.set_border_width(10)
+        self.add(self.page4)
+        # Textview + scrolled window for compressed text
+        compress_bwtHF = Gtk.Label('Compression :')
+        compress_bwtHF.set_line_wrap(True)
+        self.page4.add(compress_bwtHF)
+
+        scroll_compress_textview2 = Gtk.ScrolledWindow()
+        scroll_compress_textview2.set_hexpand(True)
+        scroll_compress_textview2.set_vexpand(True)
+        scroll_compress_textview2.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        compress_bin_textview2 = Gtk.TextBuffer()
+        compress_text_textview2 = Gtk.TextView(buffer=compress_bin_textview2)
+        compress_text_textview2.set_editable(False)
+        compress_text_textview2.set_wrap_mode(Gtk.WrapMode.CHAR)
+        compress_bin_textview2.set_text(self.parent.sanitize_string(res.text_bwtHF), -1)
+        scroll_compress_textview2.add(compress_text_textview2)
+        self.page4.attach_next_to(scroll_compress_textview2, compress_bwtHF, Gtk.PositionType.BOTTOM, 2, 3)
+
+        # Textview + scrolled window for bin text
+        bin_label2 = Gtk.Label('bin string :')
+        bin_label2.set_line_wrap(True)
+        self.scroll_bin_textview2 = Gtk.ScrolledWindow()
+        self.scroll_bin_textview2.set_hexpand(True)
+        self.scroll_bin_textview2.set_vexpand(True)
+        self.scroll_bin_textview2.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        buffer_bin_textview2 = Gtk.TextBuffer()
+        bin_text_textview2 = Gtk.TextView(buffer=buffer_bin_textview2)
+        bin_text_textview2.set_editable(False)
+        bin_text_textview2.set_wrap_mode(Gtk.WrapMode.CHAR)
+        buffer_bin_textview2.set_text(res.bin_bwtHF, -1)
+        self.scroll_bin_textview2.add(bin_text_textview2)
+
+        # tree drawing
+        tree_drawing2 = Gtk.DrawingArea()
+        tree_drawing2.connect('draw', self.parent.OnDraw_bwtHF)
+
+        tree_drawing2.set_size_request(400, 600)
+        tree_drawing2.set_hexpand(True)
+        tree_drawing2.set_vexpand(True)
+
+        self.page4.attach_next_to(bin_label2, scroll_compress_textview2, Gtk.PositionType.BOTTOM, 1, 1)
+        self.page4.attach_next_to(self.scroll_bin_textview2, bin_label2, Gtk.PositionType.BOTTOM, 2, 3)
+        self.create_alphabet_view_bwthf(res.result_bwtHF.alphabet)
+        self.page4.attach_next_to(tree_drawing2, self.alphabet_treeview2, Gtk.PositionType.BOTTOM, 2, 3)
+
+        self.parent.append_page(self, Gtk.Label('BWT+Huffmann'))
+
+    def create_alphabet_view_bwthf(self, alphabet):
+        list_store2 = Gtk.ListStore(str, str)  # len(matrix) columns declared as string
+
+        # add row to listStore
+        for key in alphabet:
+            list_store2.append([key, alphabet[key]])
+
+        # make treeview with liststore data
+        self.alphabet_treeview2 = Gtk.TreeView(list_store2)
+
+        for i in range(2):
+            renderer = Gtk.CellRendererText()
+
+            column = Gtk.TreeViewColumn(str(i), renderer, text=i)
+
+            # add column to treeview
+            self.alphabet_treeview2.append_column(column)
+
+        self.page4.attach_next_to(self.alphabet_treeview2, self.scroll_bin_textview2, Gtk.PositionType.BOTTOM, 1, 1)
 
 class Gui(Gtk.Notebook):
-    """Result window giving all the result of the different algorithm in a gtk notebook"""
+    """
+    A class used to show the result of each algorithm run in a Gtk.Notebook
+
+    ...
+
+    Attributes
+    ----------
+    parent : Gtk.Window
+        The window on which to display the notebook
+    res : Compression object defined in compression_class
+        An object holding all the information about the results
+
+    Methods
+    -------
+    sanitize_string(str)
+        Replace control character to '?' to display without error the compressed text in a Gtk.TextBox
+    OnDraw(widget, cairo)
+        Method called to draw the tree in a Gtk.DrawingArea widget using cairo
+    recursion(node, x, y, cr, narrow=0, text='')
+        Method called by OnDraw to explore the tree object defined in huffman.py. Recursively called for each
+        node in the tree, giving it an x and y coordinate to draw the node as well as a text representing the
+        node. The narrow parameter is used if the drawing become to important so that the leaf are correctly
+        displayed and not overlapped with each other.
+    """
 
     def __init__(self, parent, res):
         Gtk.Notebook.__init__(self)
@@ -19,224 +486,18 @@ class Gui(Gtk.Notebook):
 
         if self.result.compress:
             # Details page
-            self.scroll1 = Gtk.ScrolledWindow()
-            self.scroll1.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-            self.page1 = Gtk.Grid()
-            self.page1.set_border_width(10)
-
-            label_hf = Gtk.Label()
-            self.page1.add(label_hf)
-
-            original_len = Gtk.Label('Original length : {}'.format(len(res.text)))
-            original_len.set_line_wrap(True)
-            original_len.set_justify(Gtk.Justification.LEFT)
-            self.page1.attach_next_to(original_len, label_hf, Gtk.PositionType.BOTTOM, 1, 1)
-
-            if res.text_huffman != '':
-                label_hf.set_markup('<big><u>Huffman</u></big>')
-                label_hf.set_justify(Gtk.Justification.LEFT)
-                label_hf.set_line_wrap(True)
-                compress_len = Gtk.Label('Compressed length : {}'.format(len(res.text_huffman)))
-                compress_len.set_line_wrap(True)
-                compress_len.set_justify(Gtk.Justification.LEFT)
-                ratio = Gtk.Label('Ratio :{}%'.format(len(res.text_huffman) / len(res.text) * 100))
-                ratio.set_line_wrap(True)
-                ratio.set_justify(Gtk.Justification.LEFT)
-                self.page1.attach_next_to(compress_len, original_len, Gtk.PositionType.BOTTOM, 1, 1)
-                self.page1.attach_next_to(ratio, compress_len, Gtk.PositionType.BOTTOM, 1, 1)
-
-            if res.text_bwtHF != '':
-                space_label = Gtk.Label()
-                self.page1.attach(space_label, 0, 4, 1, 1)
-                label_BWTHF = Gtk.Label('BWT + HF :')
-                label_BWTHF.set_line_wrap(True)
-                label_BWTHF.set_justify(Gtk.Justification.LEFT)
-                label_BWTHF.set_markup('<big><u>BWT + HF</u> </big>')
-                self.page1.attach(label_BWTHF, 0, 4, 1, 1)
-                compress_len_bwtHF = Gtk.Label('Compressed length BWT + HF : {}'.format(len(res.text_bwtHF)))
-                compress_len_bwtHF.set_line_wrap(True)
-                compress_len_bwtHF.set_justify(Gtk.Justification.LEFT)
-                ratio_bwtHF = Gtk.Label('Ratio : {}%'.format(len(res.text_bwtHF) / len(res.text) * 100))
-                ratio_bwtHF.set_line_wrap(True)
-                self.page1.attach_next_to(compress_len_bwtHF, label_BWTHF, Gtk.PositionType.BOTTOM, 1, 1)
-                self.page1.attach_next_to(ratio_bwtHF, compress_len_bwtHF, Gtk.PositionType.BOTTOM, 1, 1)
-
-
-            self.scroll1.add(self.page1)
-            self.append_page(self.scroll1, Gtk.Label('Summary'))
+            DetailPage(self)
 
             # BWT page
             if res.text_bwt != '':
-                self.scroll2 = Gtk.ScrolledWindow()
-                self.scroll2.set_policy(
-                    Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-                self.page2 = Gtk.Grid(column_homogeneous=False, column_spacing=10, row_spacing=10)
-                self.page2.set_border_width(10)
-
-                # Inputed text Label
-                self.input_text_label = Gtk.Label('Inputed text : ')
-                self.input_text_label.set_justify(Gtk.Justification.LEFT)
-                self.input_text_label.set_line_wrap(True)
-
-                # Textview + scrolled window for inputed text
-                scroll_input_textview = Gtk.ScrolledWindow()
-                scroll_input_textview.set_hexpand(True)
-                scroll_input_textview.set_vexpand(True)
-                scroll_input_textview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-                buffer_input_textview = Gtk.TextBuffer()
-                input_text_textview = Gtk.TextView(buffer=buffer_input_textview)
-                input_text_textview.set_editable(False)
-                input_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
-
-                # buffer_input_textview.set_text(res.text, len(res.text))
-                buffer_input_textview.set_text(self.sanitize_string(res.text), -1)
-                scroll_input_textview.add(input_text_textview)
-                self.page2.add(self.input_text_label)
-                self.page2.attach(scroll_input_textview, 0, 1, 2, 3)
-
-                # Output text
-                self.output_text_label = Gtk.Label('Output text : ')
-                self.output_text_label.set_justify(Gtk.Justification.LEFT)
-                self.output_text_label.set_line_wrap(True)
-                self.page2.attach(self.output_text_label, 2, 0, 1, 1)
-
-                # Textview + scrolled window for outputed text
-                scroll_output_textview = Gtk.ScrolledWindow()
-                scroll_output_textview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-                scroll_output_textview.set_hexpand(True)
-                scroll_output_textview.set_vexpand(True)
-                buffer_output_textview = Gtk.TextBuffer()
-                output_text_textview = Gtk.TextView(buffer=buffer_output_textview)
-                output_text_textview.set_editable(False)
-                output_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
-                buffer_output_textview.set_text(res.text_bwt, -1)
-                scroll_output_textview.add(output_text_textview)
-                self.page2.attach(scroll_output_textview, 2, 1, 2, 3)
-
-                # step by step
-                if res.step_by_step:
-                    # not sorted matrix
-                    matrix_bwt = res.orientation
-                else:
-                    # already sorted matrix
-                    matrix_bwt = res.matrix_bwt
-
-                # scroll treeview
-                scroll_treeview = Gtk.ScrolledWindow()
-                scroll_treeview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-                scroll_treeview.set_hexpand(True)
-                scroll_treeview.set_vexpand(True)
-                self.matrix_list_store = Gtk.ListStore(*[str] * len(matrix_bwt[0]))  # len(matrix) columns declared as string
-
-                # add row to listStore
-                for row in matrix_bwt:
-                    self.matrix_list_store.append(list(row))
-
-
-                # make treeview with liststore data
-                matrix_treeview = Gtk.TreeView(self.matrix_list_store)
-
-                for i in range(len(list(matrix_bwt[0]))):
-                    if i == len(list(matrix_bwt[0])) - 1:
-                        renderer = Gtk.CellRendererText()
-                        renderer.set_property('background-set', 1)
-                        renderer.set_property('background', '#636965')
-                    else:
-                        renderer = Gtk.CellRendererText()
-                        renderer.set_property('background-set', 0)
-
-                    column = Gtk.TreeViewColumn(str(i), renderer, text=i)
-
-                    # add column to treeview
-                    matrix_treeview.append_column(column)
-
-                scroll_treeview.add(matrix_treeview)
-                self.page2.attach(scroll_treeview, 0, 4, 6, 6)
-                # add button to sort matrix
-                if res.step_by_step:
-                    self.button_sort = Gtk.Button('Sort')
-                    self.button_sort.connect('clicked', self.sort_orientation)
-                    self.page2.attach(self.button_sort, 0, 20, 1, 1)
-
-
-                self.scroll2.add(self.page2)
-
-                self.append_page(self.scroll2, Gtk.Label('BWT'))
-
+                BWTPage(self)
             # Huffman page
             if res.text_huffman != '':
-                scroll_page = Gtk.ScrolledWindow()
-                scroll_page.set_hexpand(True)
-                scroll_page.set_vexpand(True)
-                scroll_page.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-                self.page3 = Gtk.Grid()
-                self.page3.set_border_width(10)
-                scroll_page.add(self.page3)
-                # Textview + scrolled window for compressed text
-                compress = Gtk.Label('Compression :')
-                compress.set_line_wrap(True)
-                self.page3.add(compress)
-
-                scroll_compress_textview = Gtk.ScrolledWindow()
-                scroll_compress_textview.set_hexpand(True)
-                scroll_compress_textview.set_vexpand(True)
-                scroll_compress_textview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-                compress_bin_textview = Gtk.TextBuffer()
-                compress_text_textview = Gtk.TextView(buffer=compress_bin_textview)
-                compress_text_textview.set_editable(False)
-                compress_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
-                compress_bin_textview.set_text(self.sanitize_string(res.text_huffman), -1)
-                scroll_compress_textview.add(compress_text_textview)
-                self.page3.attach_next_to(scroll_compress_textview, compress, Gtk.PositionType.BOTTOM, 2, 3)
-
-                # Textview + scrolled window for bin text
-                bin_label = Gtk.Label('bin string : ')
-                bin_label.set_line_wrap(True)
-                scroll_bin_textview = Gtk.ScrolledWindow()
-                scroll_bin_textview.set_hexpand(True)
-                scroll_bin_textview.set_vexpand(True)
-                scroll_bin_textview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-                buffer_bin_textview = Gtk.TextBuffer()
-                bin_text_textview = Gtk.TextView(buffer=buffer_bin_textview)
-                bin_text_textview.set_editable(False)
-                bin_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
-                buffer_bin_textview.set_text(res.bin_huffman, len(res.bin_huffman))
-                scroll_bin_textview.add(bin_text_textview)
-
-                # tree drawing
-                tree_drawing = Gtk.DrawingArea()
-                tree_drawing.connect('draw', self.OnDraw)
-                tree_drawing.set_size_request(400, 400)
-                tree_drawing.set_hexpand(True)
-                tree_drawing.set_vexpand(True)
-
-                self.page3.attach_next_to(bin_label, scroll_compress_textview, Gtk.PositionType.BOTTOM, 1, 1)
-                self.page3.attach_next_to(scroll_bin_textview, bin_label, Gtk.PositionType.BOTTOM, 2, 3)
-                self.page3.attach_next_to(tree_drawing, scroll_bin_textview, Gtk.PositionType.BOTTOM, 2, 3)
-
-                self.append_page(scroll_page, Gtk.Label('Huffmann'))
+                HuffmanPage(self)
 
             # BWT + Huffman page
             if res.text_bwtHF != '':
-                self.page4 = Gtk.Grid()
-                self.page4.set_border_width(10)
-                compressed_BWT_label = Gtk.Label('Compression :')
-                self.page4.add(compressed_BWT_label)
-
-                # scrollable textview for compressed bwthf
-                scroll_compressBWT_textview = Gtk.ScrolledWindow()
-                scroll_compressBWT_textview.set_hexpand(True)
-                scroll_compressBWT_textview.set_vexpand(True)
-                scroll_compressBWT_textview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-                buffer_compressBWT_textview = Gtk.TextBuffer()
-                compressBWT_text_textview = Gtk.TextView(buffer=buffer_compressBWT_textview)
-                compressBWT_text_textview.set_editable(False)
-                compressBWT_text_textview.set_wrap_mode(Gtk.WrapMode.CHAR)
-                buffer_compressBWT_textview.set_text(self.sanitize_string(res.text_bwtHF), -1)
-                scroll_compressBWT_textview.add(compressBWT_text_textview)
-                self.page4.attach_next_to(scroll_compressBWT_textview, compressed_BWT_label, Gtk.PositionType.BOTTOM, 3,
-                                          3)
-                self.append_page(self.page4, Gtk.Label('BWT + Huffmann'))
+                BwtHfPage(self)
 
         else:
             label = Gtk.Label('{0}'.format(self.result.decoded))
@@ -262,9 +523,10 @@ class Gui(Gtk.Notebook):
 
     def recursion(self, node, x, y, cr, narrow=0, text=''):
         """ draw nodes and link following the tree"""
+
         # draw the leaf
         if node.leaf:
-            cr.set_source_rgb(86, 199, 197)
+            cr.set_source_rgb(0, 0, 200)
             cr.arc(x, y, 10, 0, 2 * math.pi)
             cr.show_text(str(node))
             cr.fill()
@@ -294,21 +556,21 @@ class Gui(Gtk.Notebook):
         """Called to draw the tree"""
         result = self.result.result_huffman
         nodes = result.tree
-        self.recursion(nodes[-1], 200, 50, cr)
+        cr.set_source_rgb(0.204, 0.204, 0.204)
+        cr.paint()
+        self.recursion(nodes[-1], 250, 50, cr)
         cr.fill()
 
     def OnDraw_bwtHF(self, w, cr):
         """Called to draw the tree"""
         result = self.result.result_bwtHF
         nodes = result.tree
-        self.recursion(nodes[-1], 200, 50, cr)
+        cr.set_source_rgb(0.204, 0.204, 0.204)
+        cr.paint()
+        self.recursion(nodes[-1], 250, 50, cr, -10)
         cr.fill()
 
-    def sort_orientation(self, widget):
-        self.matrix_list_store.clear()
-        for row in self.result.orientation_sort():
-            self.matrix_list_store.append(list(row))
-        self.page2.remove_row(20)
+
 
 class Decompression(Gtk.Grid):
     """View called when user ask for decompression"""
@@ -517,7 +779,9 @@ class InputWindow(Gtk.Grid):
 
             self.confirm = Gtk.Button('Go')
             self.confirm.connect('clicked', self.go)
-            self.attach(self.confirm, 1, 111, 1, 1)
+            self.attach(self.            self.sort = Gtk.Button('Sort')
+            self.sort.connect('clicked', self.sort_orientation)
+            self.page2.attach(self.sort, 2, 20, 1, 1)confirm, 1, 111, 1, 1)
             self.buffer.set_text('Text to be compressed...', 24)
         else:
             step_bwt = Gtk.CheckButton()

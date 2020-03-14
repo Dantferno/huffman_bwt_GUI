@@ -17,7 +17,7 @@ def step_by_step_orientation(text):
     orient = []
     for i in range(len(text)):
         orient.append(text[i:] + text[:i])
-    return orient  # return bwt str and matrix
+    return orient  # return unsorted matrix
 
 def orientation_sort(matrix):
     """sort the matrix with all orientation"""
