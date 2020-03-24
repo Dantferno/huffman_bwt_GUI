@@ -1,3 +1,20 @@
+"""
+
+Huffman part of the script
+----
+class Node implement the concept of a node in a binary tree
+
+class HuffmanResult store related data about a huffman compression
+
+freq() return the occurence of each character in a dic
+
+association_lowest() take the two nodes with the smaller value and merge them into a new node
+
+text_traduction() take
+
+
+"""
+
 class Node:
     """"Class implementing a node caracterised by a value and its two parents"""
 

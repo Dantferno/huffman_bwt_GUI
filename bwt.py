@@ -1,3 +1,24 @@
+"""
+Burrows–Wheeler transform part
+
+Function
+-------------
+construct_bwt(text):
+    Input str --> return bw transformed string and sorted matrix used to ouput bwt
+
+step_by_step_orientation(text):
+    input str --> return non sorted matrix of the bwt transform
+
+orientation_sort(matrix)return the sorted inputed matrix
+    sort a matrix
+
+decode_bwt(string)
+    decode the bwt string by computing the matrix
+
+
+"""
+
+
 def construct_bwt(text):
     """output bwt of input text"""
     text += '$'

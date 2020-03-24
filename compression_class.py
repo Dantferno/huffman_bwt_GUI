@@ -1,7 +1,46 @@
+"""
+Compression class is used to generate and store all the data about compression or decompression.
+This class is used to easily manipulate the result of the user choice of algorithm depending on input.
+"""
+
+
 from bwt import decode_bwt, construct_bwt, step_by_step_orientation, orientation_sort
 from huffman import encoding, decoding, HuffmanResult
 
 class Compression:
+    """
+        A class used to store and generate the data asked by the user
+
+        ...
+
+        Attributes
+        ----------
+        text : string
+            Text to be transformed, compressed or decompressed
+        compress : Bool
+            True if the text should be compressed, False otherwise
+        bwt : Bool
+            Should the text be bwt transformed or not
+        huffman : Bool
+            Should the text be huffman compressed or not
+        bwtHF : Bool
+            Should the text be bwt transform then huffman compressed or not
+        step_by_step : Bool
+            Should the object store the different step of the bwt or not
+
+        Methods
+        -------
+        HF_to_save()
+            Format compressed HF for saving. stored as : first line dic associating character to path
+            e.g {'a':'10','t':'11',..} followed by number of trailing 0 to trim during decompression.
+            Actual huffman compressed text stored at the next line.
+        bwtHF_to_save()
+            Same as huffman but with a '#' at the start to be easily identified
+        bwt_to_save()
+            Same as bwtHF() but with a '?' as a starting character
+        orientation_sort()
+            Return the sorted bwt matrix
+        """
     """Object storing the result of the compression base and what is asked"""
     def __init__(self, text, compress=True, bwt=False, huffman=False, bwtHF=False, step_by_step=False):
         self.text = text          # text to be compressed
@@ -55,30 +94,32 @@ class Compression:
         else:
             if text.startswith('#'): # bwt + huf
                 text = text.splitlines()
-                dic_from_str = eval(text[0][1:]) # transform back the dic
-                trim = text[1]
+                self.dic_from_str = eval(text[0][1:]) # transform back the dic
+                self.trim = text[1]
                 coded = text[2:]
-                coded = "".join(i for i in coded)
-                result = HuffmanResult(coded, trim, dic_from_str)
+                self.coded = "".join(i for i in coded)
+                result = HuffmanResult(self.coded, self.trim, self.dic_from_str)
                 decoded = decoding(result)
-                print(decoded)
+                self.algo = 'bwt+hf'
                 self.decoded = decode_bwt(decoded)
 
-            if text.startswith('?'):
+            if text.startswith('?'): #bwt
+                self.decompressed_bwt = True
                 text = text.splitlines()
-                bwt_str = "".join(i for i in text[1:])
-                self.decoded = decode_bwt(bwt_str)
+                self.bwt_str = "".join(i for i in text[1:])
+                self.algo = 'bwt'
+                self.decoded = decode_bwt(self.bwt_str)
 
 
             else: # just huffman
                 text = text.splitlines()
-                dic_from_str = eval(text[0]) # transform back the dic
-                trim = text[1]
+                self.dic_from_str = eval(text[0]) # transform back the dic
+                self.trim = text[1]
                 coded = text[2:]
-                coded = "".join(i for i in coded)
-                result = HuffmanResult(coded, trim, dic_from_str)
+                self.coded = "".join(i for i in coded)
+                result = HuffmanResult(self.coded, self.trim, self.dic_from_str)
+                self.algo = 'hf'
                 self.decoded = decoding(result)
-                print(trim, coded, dic_from_str)
 
 
     def HF_to_save(self):
