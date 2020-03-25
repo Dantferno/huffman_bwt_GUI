@@ -21,6 +21,9 @@ installation using apt :
      sudo apt install libgirepository1.0-dev
      sudo apt install libcairo2-dev
      pip3 install PyGObject 
+If the system is lacking Gobject introspection :
+
+     sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0
 
 Cairo is used to draw the tree, GTK+3 to build the GUI.
 
