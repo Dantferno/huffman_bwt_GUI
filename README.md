@@ -14,8 +14,12 @@ Only tested on Ubuntu 18.04
     GTK+3
     Python 3.1 or later
     gobject-introspection
-     (sudo apt install libgirepository1.0-dev
-      sudo apt install libcairo2-dev)
+    
+installation using apt : 
+
+
+     sudo apt install libgirepository1.0-dev
+      sudo apt install libcairo2-dev
 
 Cairo is used to draw the tree, GTK+3 to build the GUI.
 
