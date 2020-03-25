@@ -30,6 +30,6 @@ Cairo is used to draw the tree, GTK+3 to build the GUI.
 ### Use 
 To launch the GUI just run inside the git directory : 
 
-    python3 GUI.py 
+    python3 gui.py 
     
 You can then choose which algorithm you want to run and input the desired text or file. 
