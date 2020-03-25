@@ -14,14 +14,22 @@ Only tested on Ubuntu 18.04
     GTK+3
     Python 3.1 or later
     gobject-introspection
-     (sudo apt install libgirepository1.0-dev
-      sudo apt install libcairo2-dev)
+    
+installation using apt : 
+
+
+     sudo apt install libgirepository1.0-dev
+     sudo apt install libcairo2-dev
+     pip3 install PyGObject 
+If the system is lacking Gobject introspection :
+
+     sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0
 
 Cairo is used to draw the tree, GTK+3 to build the GUI.
 
 ### Use 
 To launch the GUI just run inside the git directory : 
 
-    python3 GUI.py 
+    python3 gui.py 
     
 You can then choose which algorithm you want to run and input the desired text or file. 
