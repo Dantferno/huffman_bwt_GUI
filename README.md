@@ -20,7 +20,7 @@ installation using apt :
 
      sudo apt install libgirepository1.0-dev
      sudo apt install libcairo2-dev
-     pip install PyGObject 
+     pip3 install PyGObject 
 
 Cairo is used to draw the tree, GTK+3 to build the GUI.
 
