@@ -2,7 +2,7 @@
 All classes used for the interface are present in this file.
 Class creating the window is MainWindow(Gtk.Window). The first view of the application
 is a stack (stacker(Gtk.Stack)) where you can input a text or a file depending on your algorithm choice.
-Inside each stack is an instance of the class InputWindow with different parameters.
+Inside each stack is an instance of the class InputWindow with different parameters, or the class Decompression.
 
 Once the algorithm is run, a NoteBook will appear (Gui(Gtk.Notebook)) with pages corresponding
 with the algorithm choice:
@@ -13,6 +13,10 @@ length of resulted compress text, ratio of compression
 BwtPage -> shown if bwt has to be run.
 HuffmanPage -> shown if huffman is run.
 BwtHfPage -> shown if bwt + huffman is run.
+
+If decompression is asked :
+DecompressionPage -> shown for all decompression, show decoded text as well as the encoded text in a page
+StepDecompression -> If bwt show the step by step decompression in a page
 
 """
 
@@ -442,6 +446,7 @@ class BwtHfPage(Gtk.ScrolledWindow):
         self.parent.append_page(self, Gtk.Label('BWT+Huffmann'))
 
     def create_alphabet_view_bwthf(self, alphabet):
+        """Create the treeview showing path associated with letter"""
         list_store2 = Gtk.ListStore(str, str)  # len(matrix) columns declared as string
 
         # add row to listStore
@@ -580,6 +585,20 @@ class Gui(Gtk.Notebook):
 
 
 class DecompressionPage(Gtk.ScrolledWindow):
+    """
+    A class used to show the result of the decompression
+
+    ...
+
+    Attributes
+    ----------
+    parent : Gtk.Notebook
+        The Notebook inside which to display the DecompressionPage
+    result : Compression object defined in compression_class
+        An object holding all the information about the results, inherited from the parent Gtk.Notebook
+
+    """
+
 
     def __init__(self, parent):
         super().__init__()
@@ -661,6 +680,31 @@ class DecompressionPage(Gtk.ScrolledWindow):
 
 
 class StepDecompression(Gtk.ScrolledWindow):
+    """
+    A class used to show the step by step bw untransform in a Gtk.Notebook
+
+    ...
+
+    Attributes
+    ----------
+    parent : Gtk.Notebook
+        The Notebook inside which to display the StepDecompression
+    res : Compression object defined in compression_class
+        An object holding all the information about the results, inherited from the parent Gtk.Notebook
+
+    Methods
+    -------
+    sort_matrix(widget)
+        Sort the matrix displayed inside the Treeview upon clicking on the widget
+
+    further_step((widget)
+        Choose between sorting and adding a column to the treeview
+
+    construct_table(widget)
+        reconstruct the table with an added column
+
+    """
+
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
@@ -701,8 +745,8 @@ class StepDecompression(Gtk.ScrolledWindow):
 
         self.sort_button = Gtk.Button('Next step')
         self.sort_button.connect('clicked', self.further_step)
-        self.grid.attach(self.sort_button, 0, 0, 1, 1)
-        self.grid.attach_next_to(self.matrix_treeview, self.sort_button, Gtk.PositionType.BOTTOM, 1, len(self.result.bwt_str))
+        self.grid.attach(self.sort_button, 0, 0, len(self.result.bwt_str), 1)
+        self.grid.attach_next_to(self.matrix_treeview, self.sort_button, Gtk.PositionType.BOTTOM, 1, 1)
         self.add(self.grid)
 
 
@@ -710,7 +754,7 @@ class StepDecompression(Gtk.ScrolledWindow):
         self.parent.append_page(self, Gtk.Label('Step by step BWT'))
 
     def sort_matrix(self, w=None):
-
+        """Sort the matrix after a column has been added"""
         self.matrix.sort() # sort matrix
         self.matrix_list_store.clear() # delete existing row
 
@@ -719,6 +763,7 @@ class StepDecompression(Gtk.ScrolledWindow):
             self.matrix_list_store.append(list(row))
 
     def further_step(self, w):
+        """Choose between sorting or adding a column upon cliked button"""
         self.step += 1
         if self.step % 2 == 0:
             print('pas ok', self.step)
@@ -732,6 +777,7 @@ class StepDecompression(Gtk.ScrolledWindow):
             print(self.matrix)
 
     def construct_table(self, w):
+        """Reconstruct table with the new column"""
         self.grid.remove(self.matrix_treeview)
         self.matrix_list_store = Gtk.ListStore(*[str] * self.col_nb)  # self.i column
 
@@ -770,7 +816,23 @@ class StepDecompression(Gtk.ScrolledWindow):
 
 
 class Decompression(Gtk.Grid):
-    """View called when user ask for decompression"""
+    """
+    A class used to ask the user which file needs to be decompressed
+
+    ...
+
+    Attributes
+    ----------
+    parent : Gtk.Stack
+        The Stack inside which to display the grid
+
+    Methods
+    -------
+    next(widget)
+        Go to the notebook view showing the result upon clicking on the widget
+
+    """
+
 
     def __init__(self, parent):
         Gtk.Grid.__init__(self)
@@ -791,6 +853,7 @@ class Decompression(Gtk.Grid):
         self.attach(self.confirm, 1, 111, 1, 1)
 
     def next(self, widget):
+        """Read file and go to the result NoteBook after creating the Compression Object"""
         file = self.choose_file.get_filename()
         try:
             with open(file, 'r') as f:
@@ -806,7 +869,27 @@ class Decompression(Gtk.Grid):
 
 
 class ButtonNotebook(Gtk.Grid):
-    """View containing the notebook and the buttons to return and save files"""
+    """
+    Notebook display inside this grid surrounded by button to save the results
+
+    ...
+
+    Attributes
+    ----------
+    parent : Gtk.Notebook
+        The Notebook inside which to display the HuffmanPage
+    result : Compression object defined in compression_class
+        An object holding all the information about the results, inherited from the parent Gtk.Notebook
+    notebook : The NoteBook showing the result
+
+    Methods
+    -------
+    create_alphabet_view(alphabet)
+        Create a Gtk.Treeview holding each letter of the uncompressed string associated with its corresponding
+        path in the tree using alphabet -> alphabet = {letter:'path',...}
+
+    """
+
 
     def __init__(self, parent, result):
         super().__init__()
@@ -843,6 +926,7 @@ class ButtonNotebook(Gtk.Grid):
         self.parent.contain.show_all()
 
     def save_HF(self, w):
+        """save file upon clinking on the widget"""
         self.content_to_save = self.result.huffman_save
         self.save_file(w)
 
