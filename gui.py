@@ -4,18 +4,22 @@ Class creating the window is MainWindow(Gtk.Window). The first view of the appli
 is a stack (stacker(Gtk.Stack)) where you can input a text or a file depending on your algorithm choice.
 Inside each stack is an instance of the class InputWindow with different parameters.
 
-Once the algorithm is run, a NoteBook will appear (Gui(Gtk.Notebook)) with pages corresponding with the algorithm choice:
-DetailPage -> always shown, display information about length of input, length of resulted compress text, ratio of compression
+Once the algorithm is run, a NoteBook will appear (Gui(Gtk.Notebook)) with pages corresponding
+with the algorithm choice:
+
+DetailPage -> always shown, display information about length of input,
+length of resulted compress text, ratio of compression
+
 BwtPage -> shown if bwt has to be run.
 HuffmanPage -> shown if huffman is run.
 BwtHfPage -> shown if bwt + huffman is run.
 
 """
 
-import gi
 import math
 import unicodedata
 
+import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 from gi.repository import GObject
@@ -182,7 +186,7 @@ class BWTPage(Gtk.ScrolledWindow):
         scroll_treeview.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scroll_treeview.set_hexpand(True)
         scroll_treeview.set_vexpand(True)
-        self.matrix_list_store = Gtk.ListStore(*[str] * len(matrix_bwt[0]))  # len(matrix) columns declared as string
+        self.matrix_list_store = Gtk.ListStore(*[str] * len(matrix_bwt[0]))
 
         # add row to listStore
         for row in matrix_bwt:
@@ -524,8 +528,11 @@ class Gui(Gtk.Notebook):
 
         # draw the leaf
         if node.leaf:
-            cr.set_source_rgb(0, 0, 200)
-            cr.arc(x, y, 10, 0, 2 * math.pi)
+            cr.set_source_rgb(0, 0, 0)
+            cr.arc(x, y, 15, 0, 2 * math.pi)
+            cr.fill()
+            cr.move_to(x-10, y+5)
+            cr.set_source_rgb(1, 1, 1)
             cr.show_text(str(node))
             cr.fill()
             return None
@@ -543,7 +550,10 @@ class Gui(Gtk.Notebook):
         # draw the node
         cr.set_source_rgb(101, 199, 86)
         cr.arc(x, y, 10, 0, 2 * math.pi)
-        cr.show_text(str(node))
+        cr.fill()
+        cr.set_source_rgb(0, 0, 0)
+        cr.move_to(x-5, y+5)
+        cr.show_text(str(node)[2:])
         cr.fill()
         cr.show_text(text)
         # do this for every path
@@ -635,7 +645,7 @@ class DecompressionPage(Gtk.ScrolledWindow):
 
             if self.page1.get_child_at(0, 4) is None: #Check if a widget from hf is there
                 self.page1.attach(label_bwt, 0, 5, 1, 1)
-                self.page1.attach(self.output, 0, 6, 1 ,1)
+                self.page1.attach(self.output, 0, 6, 1, 1)
             else: # attach at the beginning
                 self.page1.attach(label_bwt, 0, 3, 1, 1)
                 self.page1.attach(self.output, 0, 4, 1, 1)
@@ -656,6 +666,7 @@ class StepDecompression(Gtk.ScrolledWindow):
         self.parent = parent
         self.result = self.parent.result
         self.step = 1
+        self.col_nb = 1 # start with one column
         self.matrix = [[i] for i in self.result.bwt_str]
         self.grid = Gtk.Grid()
 
@@ -666,7 +677,76 @@ class StepDecompression(Gtk.ScrolledWindow):
             self.matrix_list_store.append(list(row))
 
         # make treeview with liststore data
-        matrix_treeview = Gtk.TreeView(self.matrix_list_store)
+        self.matrix_treeview = Gtk.TreeView(self.matrix_list_store)
+        self.matrix_treeview.set_headers_visible(False)
+
+        for i in range(len(list(self.matrix[0]))):
+            # color last column
+            if i == len(list(self.matrix[0])) - 1:
+                renderer = Gtk.CellRendererText()
+                renderer.set_property('background-set', 1)
+                renderer.set_property('background', '#636965')
+            else:
+                renderer = Gtk.CellRendererText()
+                renderer.set_property('background-set', 0)
+            if str(i) == '$':
+                renderer = Gtk.CellRendererText()
+                renderer.set_property('background-set', 1)
+                renderer.set_property('background', 'blue')
+
+            column = Gtk.TreeViewColumn(str(i), renderer, text=i)
+
+            # add column to treeview
+            self.matrix_treeview.append_column(column)
+
+        self.sort_button = Gtk.Button('Next step')
+        self.sort_button.connect('clicked', self.further_step)
+        self.grid.attach(self.sort_button, 0, 0, 1, 1)
+        self.grid.attach_next_to(self.matrix_treeview, self.sort_button, Gtk.PositionType.BOTTOM, 1, len(self.result.bwt_str))
+        self.add(self.grid)
+
+
+
+        self.parent.append_page(self, Gtk.Label('Step by step BWT'))
+
+    def sort_matrix(self, w=None):
+
+        self.matrix.sort() # sort matrix
+        self.matrix_list_store.clear() # delete existing row
+
+        # replace with sorted row
+        for row in self.matrix:
+            self.matrix_list_store.append(list(row))
+
+    def further_step(self, w):
+        self.step += 1
+        if self.step % 2 == 0:
+            print('pas ok', self.step)
+            self.sort_matrix()
+        elif self.col_nb >= len(self.result.bwt_str):
+            self.grid.remove(self.sort_button)
+            pass
+        else:
+            self.col_nb += 1
+            self.construct_table(self)
+            print(self.matrix)
+
+    def construct_table(self, w):
+        self.grid.remove(self.matrix_treeview)
+        self.matrix_list_store = Gtk.ListStore(*[str] * self.col_nb)  # self.i column
+
+        # add column to matrix
+        for i, j in enumerate(self.result.bwt_str):
+            self.matrix[i].insert(0, j)
+            print(self.matrix[i], self.step)
+
+        # add row to listStore
+        for row in self.matrix:
+            self.matrix_list_store.append(list(row))
+
+        # make treeview with liststore data
+        self.matrix_treeview = Gtk.TreeView(self.matrix_list_store)
+        self.matrix_treeview.set_headers_visible(False)
 
         for i in range(len(list(self.matrix[0]))):
             # color last column
@@ -681,35 +761,9 @@ class StepDecompression(Gtk.ScrolledWindow):
             column = Gtk.TreeViewColumn(str(i), renderer, text=i)
 
             # add column to treeview
-            matrix_treeview.append_column(column)
-        self.grid.add(matrix_treeview)
-        sort_button = Gtk.Button('Next step')
-        sort_button.connect('clicked', self.sort_matrix)
-        self.grid.attach_next_to(sort_button, matrix_treeview, Gtk.PositionType.BOTTOM, 1, 1)
-
-        self.add(self.grid)
-
-
-        self.parent.append_page(self, Gtk.Label('Step by step'))
-
-    def sort_matrix(self, w=None):
-        self.matrix.sort()
-        self.matrix_list_store.clear()
-
-        # add row to listStore
-        for row in self.matrix:
-            print(row)
-            self.matrix_list_store.append(list(row))
-
-    def further_step(self):
-        self.i +=1
-        if self.i % 2 == 0:
-            self.sort_matrix()
-        else:
-            construct_table(self)
-
-    def construct_table(self):
-        pass
+            self.matrix_treeview.append_column(column)
+        self.grid.attach_next_to(self.matrix_treeview, self.sort_button, Gtk.PositionType.BOTTOM, 1, len(self.result.bwt_str))
+        self.matrix_treeview.show()
 
 
 
@@ -990,7 +1044,10 @@ class InputWindow(Gtk.Grid):
 
 
 class MainWindow(Gtk.Window):
-    """Main window where the content change inside the box container, first view is the InputWindow inside the stacker"""
+    """
+    Main window where the content change inside the box container,
+    first view is the InputWindow inside the stacker
+    """
 
     def __init__(self):
         Gtk.Window.__init__(self, title="DNA Compressor")

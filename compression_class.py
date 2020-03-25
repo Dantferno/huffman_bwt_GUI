@@ -64,6 +64,7 @@ class Compression:
         self.bwthuffman_save = ''
         self.bwt_save = ''
 
+        # if step by step is asked store the non sorted matrix from bwt
         if step_by_step:
             self.orientation = step_by_step_orientation(text)
 
@@ -99,11 +100,11 @@ class Compression:
                 coded = text[2:]
                 self.coded = "".join(i for i in coded)
                 result = HuffmanResult(self.coded, self.trim, self.dic_from_str)
-                decoded = decoding(result)
+                self.bwt_str = decoding(result)
                 self.algo = 'bwt+hf'
-                self.decoded = decode_bwt(decoded)
+                self.decoded = decode_bwt(self.bwt_str)
 
-            if text.startswith('?'): #bwt
+            elif text.startswith('?'): #bwt
                 self.decompressed_bwt = True
                 text = text.splitlines()
                 self.bwt_str = "".join(i for i in text[1:])
